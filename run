@@ -1,0 +1,50 @@
+#!/bin/bash
+
+set -x
+set -e
+
+PERL_VERSION=5.22.1
+
+export PERLBREW_ROOT=/usr/local/perlbrew
+export PATH=$PERLBREW_ROOT/bin:$PATH
+export CHANTRY_GAME_DIRS=/app/chantry-ts
+export CHANTRY_WEBSITE_DIRS=/app/chantry-ts
+
+function as_postgres() {
+  chpst -u postgres:postgres $*
+}
+
+chown -R postgres:postgres /app
+
+#su -c "/usr/lib/postgresql/9.4/bin/postgres -d 3 -D /var/lib/postgresql/9.4/main -c config_file=/etc/postgresql/9.4/main/postgresql.conf 2>&1" postgres
+if [ ! -f /usr/local/perlbrew/done ]; then
+  curl -L http://install.perlbrew.pl | bash
+
+  perlbrew install perl-$PERL_VERSION || true
+  perlbrew install-cpanm
+  perlbrew exec --with perl-$PERL_VERSION cpanm -f --notest --skip-installed < chantry-website/main/deplist.txt
+
+  chown -R postgres:postgres /var/lib/postgresql/9.4/main
+  as_postgres '/usr/lib/postgresql/9.4/bin/initdb -D /var/lib/postgresql/9.4/main' || true
+
+  /etc/init.d/postgresql stop
+  /etc/init.d/postgresql start
+
+  as_postgres "createdb -O postgres chantry" || true
+  cd chantry-website/main/sqitch
+  as_postgres "/usr/local/perlbrew/bin/perlbrew exec --with perl-$PERL_VERSION sqitch deploy"
+
+  touch /usr/local/perlbrew/done
+else
+  /etc/init.d/postgresql stop
+  /etc/init.d/postgresql start
+
+  sed -e "s#ws://localhost:3000#ws://${EXTERNAL_HOST}#" < /app/chantry-website/main/chantry-web_app.conf.example > /app/chantry-website/main/chantry-web_app.conf
+
+  cd chantry-website/main
+
+  redis-server &
+
+  chpst -u postgres:postgres /usr/local/perlbrew/bin/perlbrew exec --with perl-$PERL_VERSION .local/start_server &
+  chpst -u postgres:postgres /usr/local/perlbrew/bin/perlbrew exec --with perl-$PERL_VERSION .local/start_worker
+fi

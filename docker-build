@@ -1,0 +1,24 @@
+#!/bin/bash
+
+set -x
+set -e
+
+if [ $(docker ps -a | grep chantry-perl | wc -l) -eq 0 ]; then
+  docker run -v /usr/local/perlbrew -v /var/lib/postgresql/9.4/main --name chantry-perl busybox true
+else
+  echo "You've got a chantry-perl container already. If you want to rebuild it,"
+  echo "docker rm chantry-perl, then run this script again."
+fi
+
+docker build -t $REPO/chantry/app .
+
+docker run --rm -it --volumes-from chantry-perl busybox rm -f /usr/local/perlbrew/done
+docker run --rm -it --volumes-from chantry-perl $REPO/chantry/app
+
+docker push $REPO/chantry/app
+
+if [ -z $SKIP_PERL ]; then
+  docker run --rm -it --volumes-from chantry-perl \
+    -v $PWD:/backup \
+    busybox tar jcvf /backup/chantry-perl.tar.bz2 /usr/local/perlbrew /var/lib/postgresql/9.4/main
+fi

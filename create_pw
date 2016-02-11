@@ -1,0 +1,9 @@
+#!/bin/bash
+
+PERL_VERSION=5.22.1
+
+export PERLBREW_ROOT=/usr/local/perlbrew
+export PATH=$PERLBREW_ROOT/bin:$PATH
+
+cd /app/chantry-website/main
+perlbrew exec --with perl-$PERL_VERSION perl script/bcrypt.pl $1

@@ -1,0 +1,14 @@
+app:
+  build: .
+  container_name: chantry
+  volumes_from:
+    - perl
+  ports:
+    - "3000:3010"
+  environment:
+    EXTERNAL_HOST: '192.168.99.100'
+perl:
+  image: busybox
+  volumes:
+    - /usr/local/perlbrew
+    - /var/lib/postgresql/9.4/main

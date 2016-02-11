@@ -1,0 +1,51 @@
+- hosts: all
+  become: true
+  become_method: sudo
+  vars:
+    with_perl: "0"
+  tasks:
+    - name: copy up chantry-perl.tar.bz2
+      when: with_perl == "1"
+      copy:
+        src: ./chantry-perl.tar.bz2
+        dest: /tmp/chantry-perl.tar.bz2
+
+    - name: remove existing perl container
+      when: with_perl == "1"
+      command: bash -c 'docker rm chantry-perl ; docker rmi chantry/perl:latest ; true'
+
+    - name: use new perl container
+      when: with_perl == "1"
+      docker:
+        name: chantry-perl
+        image: busybox
+        command: "true"
+        state: present
+        volumes:
+          - /usr/local/perlbrew
+          - /var/lib/postgresql/9.4/main
+
+    - name: import new perl container
+      when: with_perl == "1"
+      command: bash -c 'docker run --rm --volumes-from chantry-perl -v /tmp:/backup busybox tar jxvf /backup/chantry-perl.tar.bz2'
+
+    - name: remove tmp file
+      when: with_perl == "1"
+      file:
+        path: /tmp/chantry-perl.tar.bz2
+        state: absent
+
+    - name: run chantry
+      docker:
+        name: chantry-app
+        image: "{{ lookup('env','REPO') }}/chantry/app:latest"
+        pull: always
+        net: 'host'
+        volumes_from:
+          - 'chantry-perl'
+        ports:
+          - "0.0.0.0:{{ lookup('env','EXTERNAL_PORT') }}:3010"
+        env:
+          EXTERNAL_HOST: "{{ lookup('env','EXTERNAL_HOST') }}:{{ lookup('env','EXTERNAL_PORT')}}"
+        restart_policy: always
+        state: reloaded
