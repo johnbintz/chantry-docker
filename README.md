@@ -51,5 +51,5 @@ VALUES ('john', 'password-from-create_pw', 'john@example.com');
 
 Pipe that file into PostgreSQL:
 
-`docker exec -i chantry add_users < ./users.sql`
+`docker exec -i chantry chpst -u postgres psql -d chantry -a < ./users.sql`
 

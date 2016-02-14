@@ -1,3 +1,0 @@
-#!/bin/bash
-
-cat | chpst -u postgres:postgres psql -d chantry -a
